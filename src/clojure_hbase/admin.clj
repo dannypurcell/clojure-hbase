@@ -11,10 +11,15 @@
 (def ^{:tag HBaseAdmin :dynamic true} *admin*
   (atom nil))
 
-(defn hbase-admin ^HBaseAdmin []
-  (when-not @*admin*
-    (swap! *admin* #(or % (HBaseAdmin. (HBaseConfiguration/create)))))
-  @*admin*)
+(defn hbase-admin
+  "When called with no argument, creates a new HBaseAdmin from a default config and sets it to the *admin* atom.
+   When called with a config-obj, gets a HBaseAdmin from the hbase cluster represented by the given
+   HBaseConfiguration object."
+  (^HBaseAdmin []
+   (when-not @*admin*
+     (swap! *admin* #(or % (HBaseAdmin. (HBaseConfiguration/create)))))
+   @*admin*)
+  ([config-obj] (HBaseAdmin. config-obj)))
 
 (defn set-admin-config
   "Resets the *admin* atom to a new HBaseAdmin object that uses the
@@ -87,102 +92,104 @@
 ;;
 
 (defn add-column-family
-  [table-name ^HColumnDescriptor column-descriptor]
-  (.addColumn (hbase-admin) (to-bytes table-name) column-descriptor))
+  ([table-name ^HColumnDescriptor column-descriptor] (add-column-family (hbase-admin) table-name column-descriptor))
+  ([^HBaseAdmin admin table-name ^HColumnDescriptor column-descriptor]
+   (.addColumn admin (to-bytes table-name) column-descriptor)))
 
 (defn hbase-available?
-  []
-  (HBaseAdmin/checkHBaseAvailable (HBaseConfiguration.)))
+  ([] (hbase-available? (HBaseConfiguration.)))
+  ([config-obj] (HBaseAdmin/checkHBaseAvailable config-obj)))
 
 (defn compact
-  [table-or-region-name]
-  (.compact (hbase-admin) (to-bytes table-or-region-name)))
+  ([table-or-region-name] (compact (hbase-admin) table-or-region-name))
+  ([admin table-or-region-name] (.compact admin (to-bytes table-or-region-name))))
 
 (defn create-table
-  [table-descriptor]
-  (.createTable (hbase-admin) table-descriptor))
+  ([table-descriptor] (create-table (hbase-admin) table-descriptor))
+  ([admin table-descriptor] (.createTable admin table-descriptor)))
 
 (defn create-table-async
-  [^HTableDescriptor table-descriptor split-keys]
-  (.createTableAsync (hbase-admin) table-descriptor split-keys))
+  ([^HTableDescriptor table-descriptor split-keys] (create-table-async (hbase-admin) table-descriptor split-keys))
+  ([^HBaseAdmin admin ^HTableDescriptor table-descriptor split-keys] (.createTableAsync admin table-descriptor split-keys)))
 
 (defn delete-column-family
-  [table-name column-name]
-  (.deleteColumn (hbase-admin) (to-bytes table-name) (to-bytes column-name)))
+  ([table-name column-name] (delete-column-family (hbase-admin) table-name column-name))
+  ([admin table-name column-name] (.deleteColumn admin (to-bytes table-name) (to-bytes column-name))))
 
 (defn delete-table
-  [table-name]
-  (.deleteTable (hbase-admin) (to-bytes table-name)))
+  ([table-name] (delete-table (hbase-admin) table-name))
+  ([admin table-name] (.deleteTable admin (to-bytes table-name))))
 
 (defn disable-table
-  [table-name]
-  (.disableTable (hbase-admin) (to-bytes table-name)))
+  ([table-name] (disable-table (hbase-admin) table-name))
+  ([admin table-name] (.disableTable admin (to-bytes table-name))))
 
 (defn enable-table
-  [table-name]
-  (.enableTable (hbase-admin) (to-bytes table-name)))
+  ([table-name] (enable-table (hbase-admin) table-name))
+  ([admin table-name] (.enableTable admin (to-bytes table-name))))
 
 (defn flush
-  [table-or-region-name]
-  (.flush (hbase-admin) (to-bytes table-or-region-name)))
+  ([table-or-region-name] (flush (hbase-admin) table-or-region-name))
+  ([admin table-or-region-name] (.flush admin (to-bytes table-or-region-name))))
 
 (defn cluster-status
-  []
-  (.getClusterStatus (hbase-admin)))
+  ([] (cluster-status (hbase-admin)))
+  ([admin] (.getClusterStatus admin)))
 
 (defn get-connection
-  []
-  (.getConnection (hbase-admin)))
+  ([] (get-connection (hbase-admin)))
+  ([admin] (.getConnection admin)))
 
 (defn get-master
-  []
-  (.getMaster (hbase-admin)))
+  ([] (get-master (hbase-admin)))
+  ([admin] (.getMaster admin)))
 
 (defn get-table-descriptor
-  [table-name]
-  (.getTableDescriptor (hbase-admin) (to-bytes table-name)))
+  ([table-name] (get-table-descriptor (hbase-admin) table-name))
+  ([admin table-name] (.getTableDescriptor admin (to-bytes table-name))))
 
 (defn master-running?
-  []
-  (.isMasterRunning (hbase-admin)))
+  ([] (master-running? (hbase-admin)))
+  ([admin] (.isMasterRunning admin)))
 
 (defn table-available?
-  [table-name]
-  (.isTableAvailable (hbase-admin) (to-bytes table-name)))
+  ([table-name] (table-available? (hbase-admin) table-name))
+  ([admin table-name] (.isTableAvailable admin (to-bytes table-name))))
 
 (defn table-disabled?
-  [table-name]
-  (.isTableDisabled (hbase-admin) (to-bytes table-name)))
+  ([table-name] (table-disabled? (hbase-admin) table-name))
+  ([admin table-name] (.isTableDisabled admin (to-bytes table-name))))
 
 (defn table-enabled?
-  [table-name]
-  (.isTableEnabled (hbase-admin) (to-bytes table-name)))
+  ([table-name] (table-enabled? (hbase-admin) table-name))
+  ([admin table-name] (.isTableEnabled admin (to-bytes table-name))))
 
 (defn list-tables
-  []
-  (seq (.listTables (hbase-admin))))
+  ([] (list-tables (hbase-admin)))
+  ([admin] (seq (.listTables admin))))
 
 (defn major-compact
-  [table-or-region-name]
-  (.majorCompact (hbase-admin) (to-bytes table-or-region-name)))
+  ([table-or-region-name] (major-compact (hbase-admin) table-or-region-name))
+  ([admin table-or-region-name] (.majorCompact admin (to-bytes table-or-region-name))))
 
 (defn modify-column-family
-  [table-name column-name ^HColumnDescriptor column-descriptor]
-  (.modifyColumn (hbase-admin) (to-bytes table-name) (to-bytes column-name)
-                 column-descriptor))
+  ([table-name column-name ^HColumnDescriptor column-descriptor]
+   (modify-column-family (hbase-admin) table-name column-name column-descriptor))
+  ([admin table-name column-name ^HColumnDescriptor column-descriptor]
+   (.modifyColumn admin (to-bytes table-name) (to-bytes column-name) column-descriptor)))
 
 (defn modify-table
-  [table-name table-descriptor]
-  (.modifyTable (hbase-admin) (to-bytes table-name) table-descriptor))
+  ([table-name table-descriptor] (modify-table (hbase-admin) table-name table-descriptor))
+  ([admin table-name table-descriptor] (.modifyTable admin (to-bytes table-name) table-descriptor)))
 
 (defn shutdown
-  []
-  (.shutdown (hbase-admin)))
+  ([] (shutdown (hbase-admin)))
+  ([admin] (.shutdown admin)))
 
 (defn split
-  [table-or-region-name]
-  (.split (hbase-admin) (to-bytes table-or-region-name)))
+  ([table-or-region-name] (.split (hbase-admin) table-or-region-name))
+  ([admin table-or-region-name] (.split admin (to-bytes table-or-region-name))))
 
 (defn table-exists?
-  [table-name]
-  (.tableExists (hbase-admin) (to-bytes table-name)))
+  ([table-name] (table-exists? (hbase-admin) table-name))
+  ([admin table-name] (.tableExists admin (to-bytes table-name))))
