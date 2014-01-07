@@ -2,7 +2,7 @@
   (:refer-clojure :rename {get map-get})
   (:use clojure-hbase.internal)
   (:import [org.apache.hadoop.hbase HBaseConfiguration HConstants KeyValue]
-           [org.apache.hadoop.hbase.client HTablePool Get Put Delete Scan Result RowLock HTableInterface]
+           [org.apache.hadoop.hbase.client HTablePool Get Put Delete Scan Result RowLock HTableInterface HTableFactory]
            [org.apache.hadoop.hbase.util Bytes]))
 
 (def ^{:private true} put-class
@@ -209,16 +209,40 @@
    (.getScanner table scan)))
 
 (defn table
-  "Gets an HTable from the open HTablePool by name."
-  [table-name]
-  (io!
-   (.getTable (htable-pool) (to-bytes table-name))))
+  "When called with a table-name, gets an HTable from the open HTablePool by name.
+   When called with a config-obj  and table-name, creates an HTable using the connection represented by the given
+   HBaseConfiguration.
+   "
+  ([table-name] (io! (.getTable (htable-pool) (to-bytes table-name))))
+  ([config-obj table-name] (io! (.createHTableInterface (HTableFactory.) config-obj (to-bytes table-name)))))
 
 (defn release-table
   "Puts an HTable back into the open HTablePool."
   [#^HTableInterface table]
   (io!
    (.putTable (htable-pool) table)))
+
+;; slightly modified copy of with-scanner
+(defmacro with-closable
+  "Executes body, after creating the closables given in the bindings. Any scanner, table, or admin
+   created in this way (use the functions scanner, scan!, table, or clojure-hbase.admin/make-hbase-admin)
+   will automatically be closed when the body finishes.
+
+   Example: (def conf (hb/make-config {:hbase.zookeeper.quorum \"127.0.0.1\"}))
+            (hb/with-closable [users (hb/table conf \"test-users\")]
+                              (hb/put users \"testrow\" :values [:account [:c1 \"test\" :c2 \"test2\"]]))
+  "
+  [bindings & body]
+  {:pre [(vector? bindings)
+         (even? (count bindings))]}
+  (cond
+    (= (count bindings) 0) `(do ~@body)
+    (symbol? (bindings 0)) `(let ~(subvec bindings 0 2)
+                              (try
+                                (with-closable ~(subvec bindings 2) ~@body)
+                                (finally
+                                  (.close ~(bindings 0)))))
+    :else (throw (IllegalArgumentException. "Bindings must be symbols."))))
 
 ;; with-table and with-scanner are basically the same function, but I couldn't
 ;; figure out a way to generate them both with the same macro.

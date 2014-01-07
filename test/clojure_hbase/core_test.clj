@@ -12,6 +12,8 @@
 
 (def ^:dynamic *test-util* (atom nil))
 
+(defn test-conf [] (.getConfiguration @*test-util*))
+
 ;; Testing Utilities
 
 (defn keywordize [x] (keyword (Bytes/toString x)))
@@ -142,6 +144,79 @@
        (is (= '() (as-vector (get test-tbl row :column
                                   [cf-name :testqual])))
            "Successfully executed Delete of the Put.")))))
+
+;drop in replacement for with-table
+(deftest get-put-delete-with-closable
+  (let [cf-name "test-cf-name"
+        row     "testrow"
+        rowvalue   [[:test-cf-name :testqual nil :testval]]]
+    (as-test
+      (disable-table test-tbl-name)
+      (add-column-family test-tbl-name (column-descriptor cf-name))
+      (enable-table test-tbl-name)
+      (with-closable [test-tbl (table test-tbl-name)]
+                  (put test-tbl row :value [cf-name :testqual :testval])
+                  (is (= rowvalue
+                         (test-vector
+                           (get test-tbl row :column
+                                [cf-name :testqual])))
+                      "Successfully executed Put :value and Get :column.")
+                  (is (= rowvalue
+                         (test-vector
+                           (get test-tbl row :family :test-cf-name)))
+                      "Successfully executed Get :family.")
+                  (let [timestamp (-> (get test-tbl row :column
+                                           [cf-name :testqual])
+                                      (as-vector) (first) (nth 2))]
+                    (is (= rowvalue (test-vector (get test-tbl row
+                                                      :time-stamp timestamp)))
+                        "Sucessfully executed Get :time-stamp")
+                    (is (= rowvalue (test-vector
+                                      (get test-tbl row
+                                           :time-range [(dec timestamp) (inc timestamp)])))
+                        "Successfully executed Get :time-range"))
+                  ;; Delete the row
+                  (delete test-tbl row :column [cf-name :testqual])
+                  (is (= '() (as-vector (get test-tbl row :column
+                                             [cf-name :testqual])))
+                      "Successfully executed Delete of the Put.")))))
+
+(deftest get-put-delete-with-injected-conf
+  (let [cf-name "test-cf-name"
+        row     "testrow"
+        rowvalue   [[:test-cf-name :testqual nil :testval]]]
+    (as-test
+      (let [conf (test-conf)
+            admin (hbase-admin conf)]
+        (disable-table admin test-tbl-name)
+        (add-column-family admin test-tbl-name (column-descriptor cf-name))
+        (enable-table admin test-tbl-name)
+        (with-closable [test-tbl (table conf test-tbl-name)]
+                       (put test-tbl row :value [cf-name :testqual :testval])
+                       (is (= rowvalue
+                              (test-vector
+                                (get test-tbl row :column
+                                     [cf-name :testqual])))
+                           "Successfully executed Put :value and Get :column.")
+                       (is (= rowvalue
+                              (test-vector
+                                (get test-tbl row :family :test-cf-name)))
+                           "Successfully executed Get :family.")
+                       (let [timestamp (-> (get test-tbl row :column
+                                                [cf-name :testqual])
+                                           (as-vector) (first) (nth 2))]
+                         (is (= rowvalue (test-vector (get test-tbl row
+                                                           :time-stamp timestamp)))
+                             "Sucessfully executed Get :time-stamp")
+                         (is (= rowvalue (test-vector
+                                           (get test-tbl row
+                                                :time-range [(dec timestamp) (inc timestamp)])))
+                             "Successfully executed Get :time-range"))
+                       ;; Delete the row
+                       (delete test-tbl row :column [cf-name :testqual])
+                       (is (= '() (as-vector (get test-tbl row :column
+                                                  [cf-name :testqual])))
+                           "Successfully executed Delete of the Put."))))))
 
 (deftest put-timestamped
   (let [cf-name "test-cf-name"
